@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="cs" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MatikaBet</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: '#6366f1', // indigo-500
+            brandHover: '#4f46e5', // indigo-600
+            accent: '#10b981', // emerald-500
+            darkBg: '#0f172a', // slate-900
+            cardBg: '#1e293b', // slate-800
+            cardBorder: '#334155' // slate-700
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+    .hidden-view { display: none !important; }
+    .card { background-color: #1e293b; border-color: #334155; }
+    /* Vlastní stylování scrollbaru v tabulce */
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  
+  <!-- HLAVNÍ NAVIGACE -->
+  <header class="bg-cardBg border-b border-cardBorder p-4 shadow-sm">
+    <div class="max-w-5xl mx-auto flex justify-between items-center">
+      <div class="text-xl font-bold tracking-wide text-white">
+        Matika<span class="text-brand">Bet</span>
+      </div>
+      <div id="userInfo" class="hidden-view items-center gap-4">
+        <div class="text-sm text-slate-400">
+          Hráč: <span id="navUsername" class="font-semibold text-white"></span>
+        </div>
+        <div class="text-sm bg-darkBg px-3 py-1.5 rounded-md border border-cardBorder shadow-inner">
+          <span class="text-slate-400 mr-1">Zůstatek:</span><span id="navBalance" class="font-bold text-accent">0</span>
+        </div>
+        <button onclick="logout()" class="text-xs text-slate-500 hover:text-white transition-colors font-semibold">Odhlásit se</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-grow max-w-5xl mx-auto w-full p-4 mt-6">
+    
+    <!-- PŘIHLÁŠENÍ -->
+    <div id="loginView" class="card max-w-sm mx-auto p-8 rounded-xl shadow-xl text-center mt-12 border">
+      <h2 class="text-2xl font-bold text-white mb-3">Přihlášení</h2>
+      
+      <div class="bg-blue-900/20 border border-blue-800 text-blue-200 p-3 rounded-lg text-xs mb-6 text-left shadow-sm flex flex-col gap-2">
+        <p><strong>Upozornění:</strong> Zadejte prosím své pravdivé jméno ve formátu <em>Jméno Příjmení</em>. Žádné z těchto informací nebudou nikde zveřejněny.</p>
+        <p class="text-yellow-400">Všechno na tomto webu je zcela fiktivní a slouží pouze pro pobavení.</p>
+      </div>
+
+      <form id="loginForm" class="flex flex-col gap-4">
+        <input type="text" id="usernameInput" placeholder="Jméno Příjmení" required class="bg-darkBg border border-cardBorder text-white p-3 rounded-lg focus:outline-none focus:border-brand text-center transition-colors">
+        <button type="submit" class="bg-brand text-white font-semibold p-3 rounded-lg hover:bg-brandHover transition-colors shadow-lg shadow-brand/20">Vstoupit do aplikace</button>
+      </form>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dashboardView" class="hidden-view flex-col gap-6">
+      
+      <!-- Upozornění -->
+      <div class="bg-yellow-900/20 border border-yellow-800 text-yellow-200 p-4 rounded-lg text-sm flex items-start gap-3 shadow-sm">
+        <svg class="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <p><strong>Důležité upozornění:</strong> Všechno na tomto webu je čistě fiktivní a slouží pouze pro pobavení. Nejedná se o skutečné sázení a kredity nemají žádnou finanční hodnotu. Pro správu vašich fiktivních kreditů kontaktujte osobně vašeho bankéře.</p>
+      </div>
+
+      <!-- KARTY SÁZEK -->
+      <div>
+        <div class="flex justify-between items-end mb-4">
+          <h2 class="text-xl font-bold text-white">Kurzy na tento týden</h2>
+          <div class="text-sm text-slate-400">Celkem vsazeno: <span id="totalPoolDisplay" class="font-bold text-white">0</span> kr.</div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="bettingCards"></div>
+      </div>
+
+      <!-- HISTORIE MOJICH SÁZEK -->
+      <div class="card p-5 rounded-xl border mt-2 shadow-sm">
+        <h2 class="text-lg font-bold text-white mb-4">Historie vašich sázek</h2>
+        <div id="myBetsList" class="flex flex-col gap-3"></div>
+      </div>
+
+      <!-- ADMIN PANEL -->
+      <div id="adminView" class="hidden-view mt-10">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="h-px bg-cardBorder flex-grow"></div>
+          <h2 class="text-lg font-bold text-brand tracking-wider uppercase">Panel Bankéře</h2>
+          <div class="h-px bg-cardBorder flex-grow"></div>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Správa kreditů a uživatelů -->
+          <div class="card p-5 rounded-xl border shadow-sm flex flex-col">
+            <h3 class="font-bold text-white mb-2">Správa účtů a kreditů</h3>
+            <p class="text-xs text-slate-400 mb-4">Vyberte uživatele pro přidání/odebrání kreditu nebo smazání jeho účtu.</p>
+            <div class="flex flex-col gap-4 flex-grow">
+              <select id="adminUserSelect" class="bg-darkBg border border-cardBorder p-3 text-white rounded-lg focus:border-brand outline-none transition-colors"></select>
+              <div class="flex gap-2">
+                <input type="number" id="adminAmountInput" placeholder="Částka" class="w-full bg-darkBg border border-cardBorder p-3 text-white rounded-lg focus:border-brand outline-none transition-colors">
+                <button onclick="adminUpdateBalance(true)" class="bg-accent text-white font-bold px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors tooltip" title="Přidat kredity">+</button>
+                <button onclick="adminUpdateBalance(false)" class="bg-red-500 text-white font-bold px-4 py-2 rounded-lg hover:bg-red-600 transition-colors tooltip" title="Odebrat kredity">-</button>
+              </div>
+              <button onclick="adminDeleteUser()" class="mt-2 bg-red-900/50 border border-red-700 text-red-400 font-semibold p-2 rounded-lg hover:bg-red-800 hover:text-white transition-colors text-sm">Smazat účet vybraného uživatele</button>
+            </div>
+          </div>
+
+          <!-- Vyhodnocení testu -->
+          <div class="card p-5 rounded-xl border shadow-sm">
+            <h3 class="font-bold text-white mb-2">Vyhodnocení testu</h3>
+            <p class="text-xs text-slate-400 mb-4">Systém bankéře nic nestojí. Všechny vsazené peníze v banku se spravedlivě rozdělí mezi ty, co si vsadili na správný den.</p>
+            <div class="flex flex-col gap-3">
+              <select id="adminDaySelect" class="w-full bg-darkBg border border-cardBorder p-3 text-white rounded-lg focus:border-brand outline-none transition-colors">
+                <option value="tue">Úterý</option>
+                <option value="wed">Středa</option>
+                <option value="thu">Čtvrtek</option>
+                <option value="fri">Pátek</option>
+                <option value="none">Test nebyl (Vrátit všem vklady)</option>
+              </select>
+              <button onclick="adminResolveWeek()" class="bg-brand text-white font-semibold px-6 py-3 rounded-lg hover:bg-brandHover transition-colors mt-1">Vyplatit výherce a resetovat týden</button>
+              <button onclick="adminPreviewWinners()" class="bg-indigo-900/50 border border-indigo-700 text-indigo-300 font-semibold px-6 py-3 rounded-lg hover:bg-indigo-800 hover:text-white transition-colors mt-2">Zobrazit výherce a výhry (Náhled)</button>
+            </div>
+          </div>
+
+          <!-- Tabulka všech sázek -->
+          <div class="card p-5 rounded-xl border shadow-sm lg:col-span-2">
+            <h3 class="font-bold text-white mb-4">Přehled všech podaných sázek v tomto týdnu</h3>
+            <div class="max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+              <table class="w-full text-left border-collapse">
+                <thead class="bg-darkBg/50 text-xs text-slate-400 uppercase sticky top-0">
+                  <tr>
+                    <th class="p-3 font-semibold rounded-tl-lg">Uživatel</th>
+                    <th class="p-3 font-semibold">Den</th>
+                    <th class="p-3 font-semibold rounded-tr-lg">Vsazeno</th>
+                  </tr>
+                </thead>
+                <tbody id="adminAllBets" class="text-sm"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- JAVASCRIPT LOGIKA -->
+  <script>
+    const STORAGE_KEY = 'matikaBetState';
+    
+    let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+      users: {},
+      bets: []
+    };
+
+    let currentUser = null;
+
+    const daysConfig = {
+      tue: { name: 'Úterý' },
+      wed: { name: 'Středa' },
+      thu: { name: 'Čtvrtek' },
+      fri: { name: 'Pátek' }
+    };
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function getTotalPool() {
+      return state.bets.reduce((sum, b) => sum + b.amount, 0);
+    }
+
+    function getDayPool(day) {
+      return state.bets.filter(b => b.day === day).reduce((sum, b) => sum + b.amount, 0);
+    }
+
+    function calculateOdds(day) {
+      const totalPool = getTotalPool();
+      const dayPool = getDayPool(day);
+      
+      if (totalPool === 0) return '1.00'; // Zatím nikdo nevsadil
+      if (dayPool === 0) return 'Max'; // Pokud někdo teď vsadí na tento den, vezme celý bank
+      
+      // Stoprocentní výplata podle reálného banku
+      const odds = totalPool / dayPool;
+      return odds.toFixed(2);
+    }
+
+    function getMyBets() {
+      return state.bets.filter(b => b.user === currentUser);
+    }
+
+    function placeBet(day, amount) {
+      amount = parseInt(amount);
+      if (isNaN(amount) || amount <= 0) return alert('Zadejte platnou částku.');
+      if (state.users[currentUser].balance < amount) return alert('Nemáte dostatek kreditů na účtu.');
+
+      const myBets = getMyBets();
+      const hasBetOnOtherDay = myBets.some(b => b.day !== day);
+      if (hasBetOnOtherDay) {
+        return alert('Můžete si vsadit pouze na jeden den v týdnu! Pokud chcete vsadit více, musíte přisadit na den, na který už máte vsazeno.');
+      }
+
+      // Strhnutí z účtu hráče
+      state.users[currentUser].balance -= amount;
+      // Přidání do celkového banku
+      state.bets.push({ user: currentUser, day, amount });
+      
+      saveState();
+      renderDashboard();
+      
+      const input = document.getElementById('bet-input-' + day);
+      if(input) input.value = '';
+    }
+
+    // --- ADMIN FUNKCE ---
+
+    function adminUpdateBalance(isAdd) {
+      const user = document.getElementById('adminUserSelect').value;
+      const amount = parseInt(document.getElementById('adminAmountInput').value);
+      if (!user || isNaN(amount) || amount <= 0) return alert('Zadejte platnou částku a vyberte uživatele.');
+      
+      if (isAdd) {
+        state.users[user].balance += amount;
+      } else {
+        if (state.users[user].balance < amount) return alert('Uživatel nemá dostatek kreditů k odečtení.');
+        state.users[user].balance -= amount;
+      }
+      saveState();
+      document.getElementById('adminAmountInput').value = '';
+      renderDashboard();
+    }
+
+    function adminDeleteUser() {
+      const user = document.getElementById('adminUserSelect').value;
+      if (!user) return alert('Vyberte uživatele ze seznamu.');
+
+      if (user.toUpperCase() === 'MAREKF1') {
+        return alert('Nemůžete smazat účet hlavního bankéře!');
+      }
+
+      if (confirm(`Opravdu chcete TRVALE smazat uživatele ${user}?\nKredity i aktivní sázky tohoto uživatele budou ztraceny a bank na tento týden se tím může změnit.`)) {
+        delete state.users[user];
+        state.bets = state.bets.filter(b => b.user !== user);
+        saveState();
+        alert(`Uživatel ${user} byl úspěšně smazán.`);
+        renderDashboard();
+      }
+    }
+
+    function adminPreviewWinners() {
+      const day = document.getElementById('adminDaySelect').value;
+      const totalPool = getTotalPool();
+      
+      if (totalPool === 0) {
+        return alert('V banku nic není, nejsou žádní výherci.');
+      }
+      
+      if (day === 'none') {
+        let msg = "Test nebyl - vrací se vklady:\n\n";
+        state.bets.forEach(b => {
+          msg += `- ${b.user}: vrátit ${b.amount} kr.\n`;
+        });
+        return alert(msg);
+      }
+
+      const dayPool = getDayPool(day);
+      if (dayPool === 0) {
+        return alert(`Na ${daysConfig[day].name} nikdo nevsadil. Bank se bude vracet všem hráčům podle jejich vkladů.`);
+      }
+
+      const odds = totalPool / dayPool;
+      let msg = `Výherci pro den ${daysConfig[day].name} (Kurz: ${odds.toFixed(2)}):\n\n`;
+      let found = false;
+
+      state.bets.forEach(b => {
+        if (b.day === day) {
+          const winAmount = b.amount * odds;
+          msg += `- ${b.user}: ${winAmount.toFixed(2)} kr.\n`;
+          found = true;
+        }
+      });
+
+      if (!found) {
+        msg += "Nikdo.\n";
+      }
+
+      alert(msg);
+    }
+
+    function adminResolveWeek() {
+      const day = document.getElementById('adminDaySelect').value;
+      if (!confirm('Opravdu chcete vyhodnotit týden? Veškeré kredity v banku se rozdělí.')) return;
+      
+      const totalPool = getTotalPool();
+      
+      if (day === 'none') {
+        // Test nebyl - refundace vkladů
+        state.bets.forEach(b => {
+          if(state.users[b.user]) {
+            state.users[b.user].balance += b.amount;
+          }
+        });
+        alert('Test nebyl. Kredity byly vráceny uživatelům zpět na účty.');
+      } else {
+        const dayPool = getDayPool(day);
+        
+        if (totalPool > 0) {
+          if (dayPool > 0) {
+            // Rozdělení 100 % banku mezi lidi, co vsadili správně
+            const odds = totalPool / dayPool;
+            state.bets.forEach(b => {
+              if (b.day === day && state.users[b.user]) {
+                state.users[b.user].balance += b.amount * odds;
+              }
+            });
+            alert(`Vyhodnoceno! Kurz na ${daysConfig[day].name} byl ${odds.toFixed(2)}.\nVýhry byly spravedlivě rozděleny.`);
+          } else {
+            // Pokud nikdo neuhodl správný den, nesmí si bankéř nechat bank
+            // Peníze se prostě vrátí všem.
+            state.bets.forEach(b => {
+              if(state.users[b.user]) {
+                state.users[b.user].balance += b.amount;
+              }
+            });
+            alert('Na tento den si nikdo nevsadil! Veškeré sázky byly proto všem vráceny, aby bankéř nemusel spravovat cizí propadnuté peníze.');
+          }
+        } else {
+          alert('Nikdo v tomto týdnu nevsadil, není co vyhodnocovat.');
+        }
+      }
+      
+      // Vyčištění sázek pro nový týden
+      state.bets = [];
+      saveState();
+      renderDashboard();
+    }
+
+    // --- VYKRESLOVÁNÍ ---
+
+    function renderDashboard() {
+      document.getElementById('navBalance').textContent = Math.floor(state.users[currentUser].balance);
+      document.getElementById('totalPoolDisplay').textContent = getTotalPool();
+
+      const container = document.getElementById('bettingCards');
+      container.innerHTML = '';
+      
+      for (const [dayKey, dayInfo] of Object.entries(daysConfig)) {
+        const odds = calculateOdds(dayKey);
+        const myBetOnDay = getMyBets().filter(b => b.day === dayKey).reduce((sum, b) => sum + b.amount, 0);
+        const dayPool = getDayPool(dayKey);
+        
+        container.innerHTML += `
+          <div class="card p-5 rounded-xl border flex flex-col gap-3 transition-colors hover:border-slate-600">
+            <div class="flex justify-between items-center">
+              <h3 class="font-bold text-lg text-white">${dayInfo.name}</h3>
+              <span class="bg-darkBg px-2.5 py-1 rounded-md text-sm text-brand border border-brand/30 font-medium tracking-wide">Kurz: ${odds}</span>
+            </div>
+            <div class="text-sm text-slate-400 mt-1">Vsazeno ostatními: <span class="text-white">${dayPool}</span> kr.</div>
+            ${myBetOnDay > 0 ? `<div class="text-xs text-accent font-semibold bg-emerald-500/10 px-3 py-2 rounded-md inline-block mt-1">Moje sázka: ${myBetOnDay} kr.</div>` : '<div class="h-8 mt-1"></div>'}
+            <div class="mt-auto pt-4 border-t border-cardBorder flex gap-2">
+              <input type="number" id="bet-input-${dayKey}" min="1" placeholder="Částka" class="w-full bg-darkBg border border-cardBorder rounded-lg px-3 py-2 text-white text-sm focus:border-brand focus:outline-none transition-colors">
+              <button onclick="placeBet('${dayKey}', document.getElementById('bet-input-${dayKey}').value)" class="bg-brand text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-brandHover transition-colors">Vsadit</button>
+            </div>
+          </div>
+        `;
+      }
+
+      const list = document.getElementById('myBetsList');
+      list.innerHTML = '';
+      const myBets = getMyBets();
+      if (myBets.length === 0) {
+        list.innerHTML = '<div class="text-slate-500 text-sm italic py-2">Zatím nemáte žádné sázky pro tento týden.</div>';
+      } else {
+        const aggregatedBets = {};
+        myBets.forEach(b => {
+          if(!aggregatedBets[b.day]) aggregatedBets[b.day] = 0;
+          aggregatedBets[b.day] += b.amount;
+        });
+
+        Object.keys(aggregatedBets).forEach(day => {
+          list.innerHTML += `
+            <div class="flex justify-between bg-darkBg/50 p-3 rounded-lg border border-cardBorder text-sm items-center">
+              <span class="text-slate-300">Sázka na test v den: <span class="text-white font-semibold">${daysConfig[day].name}</span></span>
+              <span class="text-accent font-bold text-base">${aggregatedBets[day]} kr.</span>
+            </div>
+          `;
+        });
+      }
+
+      // Zobrazení pro Bankéře (MarekF1 - case insensitive)
+      if (currentUser.toUpperCase() === 'MAREKF1') {
+        document.getElementById('adminView').classList.remove('hidden-view');
+        
+        // Tabulka sázek
+        const allBetsList = document.getElementById('adminAllBets');
+        allBetsList.innerHTML = '';
+        if (state.bets.length === 0) {
+          allBetsList.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-slate-500 italic">V tomto týdnu zatím nikdo nevsadil.</td></tr>';
+        } else {
+          state.bets.forEach(b => {
+            allBetsList.innerHTML += `
+              <tr class="border-b border-cardBorder/50 hover:bg-darkBg/30 transition-colors">
+                <td class="p-3 text-white">${b.user}</td>
+                <td class="p-3 text-slate-300">${daysConfig[b.day].name}</td>
+                <td class="p-3 text-accent font-semibold">${b.amount} kr.</td>
+              </tr>
+            `;
+          });
+        }
+
+        // Seznam uživatelů pro bankéře
+        const userSelect = document.getElementById('adminUserSelect');
+        const prevSelect = userSelect.value;
+        userSelect.innerHTML = '';
+        
+        const sortedUsers = Object.keys(state.users).sort((a, b) => a.localeCompare(b));
+        sortedUsers.forEach(u => {
+          userSelect.innerHTML += `<option value="${u}">${u} (Zůstatek: ${Math.floor(state.users[u].balance)} kr.)</option>`;
+        });
+        
+        if(prevSelect && state.users[prevSelect]) {
+          userSelect.value = prevSelect;
+        }
+
+      } else {
+        document.getElementById('adminView').classList.add('hidden-view');
+      }
+    }
+
+    // --- LOGIN LOGIKA ---
+
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const name = document.getElementById('usernameInput').value.trim();
+      if (!name) return;
+      
+      if (!state.users[name]) {
+        // Nová registrace
+        state.users[name] = { balance: 0 };
+        saveState();
+      }
+      
+      currentUser = name;
+      document.getElementById('usernameInput').value = '';
+      renderApp();
+    });
+
+    function logout() {
+      currentUser = null;
+      renderApp();
+    }
+
+    function renderApp() {
+      if (currentUser) {
+        document.getElementById('loginView').classList.add('hidden-view');
+        document.getElementById('dashboardView').classList.remove('hidden-view');
+        document.getElementById('userInfo').classList.remove('hidden-view');
+        document.getElementById('userInfo').classList.add('flex');
+        document.getElementById('navUsername').textContent = currentUser;
+        renderDashboard();
+      } else {
+        document.getElementById('loginView').classList.remove('hidden-view');
+        document.getElementById('dashboardView').classList.add('hidden-view');
+        document.getElementById('userInfo').classList.add('hidden-view');
+        document.getElementById('userInfo').classList.remove('flex');
+      }
+    }
+
+    renderApp();
+  </script>
+</body>
+</html>
